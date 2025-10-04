@@ -14,7 +14,7 @@ import pickle
 
 st.set_page_config(page_title="EDA Cancer",
                    page_icon="📊",
-                  layout= "wide")
+                   layout="wide")
 
 # -----------------------------
 # Datos
@@ -46,7 +46,6 @@ st.markdown("""
         proporcionando visualizaciones y estadísticas descriptivas para facilitar la comprensión del comportamiento de cada variable 
         según el diagnóstico.
     </div>
-
     """, unsafe_allow_html=True)
 
 st.subheader("Primeras filas del dataset")
@@ -321,3 +320,131 @@ El siguiente mapa de calor representa las correlaciones entre las variables del 
 ---
 """)
 
+# =====================
+# Modelo interno
+# =====================
+
+
+st.title("🧮 Prediccion del tipo de tumor - Entrenado al incluir variables")
+
+st.markdown("""
+<div style="text-align: justify;">
+A continuación, puedes seleccionar un conjunto de variables para construir un modelo de regresión logística, por defecto se seleccionara la media del area, perimetro, concavidad y radio pero puedes eliminarlas o seleccionar mas variables. Una vez entrenado, podrás realizar predicciones de diagnóstico sobre nuevos datos ingresados manualmente.
+</div>
+""", unsafe_allow_html=True)
+
+
+variables_por_defecto = ["radius_mean", "perimeter_mean", "area_mean", "concavity_mean"]
+
+# Mostrar multiselect con preselección
+variables_predictoras = st.multiselect(
+    "",
+    df.columns.drop("Diagnóstico"),
+    default=[var for var in variables_por_defecto if var in df.columns]
+)
+
+if len(variables_predictoras) > 0:
+    # División de los datos
+    X = df[variables_predictoras]
+    y = df['Diagnóstico'].map({"Benigno": 0, "Maligno": 1})
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Entrenar el modelo
+    modelo = LogisticRegression(max_iter=1000)
+    modelo.fit(X_train, y_train)
+
+    # Evaluación del modelo
+    st.subheader("Reporte del Modelo")
+    y_pred = modelo.predict(X_test)
+    report = classification_report(y_test, y_pred, output_dict=True)
+    st.dataframe(pd.DataFrame(report).transpose().round(2))
+
+    # Predicción individual
+    st.markdown("""
+    ---
+    ### 🧪 Valores para Predicción
+    Ingresa los valores para cada variable seleccionada:
+    """)
+
+    input_data = {}
+    for var in variables_predictoras:
+        input_data[var] = st.number_input(var, min_value=float(0), max_value=float(10000), value=float(df[var].mean()))
+
+    if st.button("Predecir Diagnóstico"):
+        input_df = pd.DataFrame([input_data])
+        prediccion = modelo.predict(input_df)[0]
+        probabilidad = modelo.predict_proba(input_df)[0][1]
+
+        if prediccion == 1:
+            st.markdown(f"<span style='color:red; font-weight:bold;'>✅ Diagnóstico predicho: Maligno 🔴</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='color:red;'>🔬 Probabilidad de ser maligno: {probabilidad:.2%}</span>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<span style='color:green; font-weight:bold;'>✅ Diagnóstico predicho: Benigno 🟢</span>", unsafe_allow_html=True)
+            st.markdown(f"Probabilidad de ser maligno: <span style='color:red;'>🔬  {str(round(probabilidad * 100, 2)) + "%"}</span>", unsafe_allow_html=True)
+else:
+    st.info("Selecciona al menos una variable para entrenar el modelo.")
+
+
+st.markdown("""
+---
+""")
+
+
+st.title("🩺 Predicción de Cáncer de Mama cargando un modelo Pickle")
+
+# =====================
+# Carga del pickle
+# =====================
+
+with open("modelo_cancer.pkl", "rb") as archivos:
+    data = pickle.load(archivos)
+
+modelo = data["modelo"]
+features = data["features"]
+
+st.write("Introduce los valores de las características:")
+
+
+# =====================
+# Crear inputs con valores por defecto en la media
+# =====================
+
+medias = datos.drop(columns=["id", "diagnosis"]).mean()
+
+entrada_usuario = {}
+for col in features:
+    entrada_usuario[col] = st.number_input(
+        f"{col}",
+        value=float(medias[col]),   # valor medio por defecto
+        format="%.4f"
+    )
+
+# =====================
+# Predicción
+# =====================
+if st.button("Predecir"):
+    X_new = pd.DataFrame([entrada_usuario], columns=features)
+    pred = modelo.predict(X_new)[0]
+    proba_benigno = modelo.predict_proba(X_new)[0][0]  # solo probabilidad de Benigno
+
+    # Asignar color según el nivel de probabilidad
+    if proba_benigno >= 0.75:
+        color = "green"
+    elif proba_benigno >= 0.50:
+        color = "orange"
+    else:
+        color = "red"
+
+    # Mostrar resultado con colores
+    st.subheader("Resultado de la Predicción")
+    st.markdown(
+        f"""
+        <div style="padding:15px; border-radius:10px; background-color:{color}; text-align:center; color:white; font-size:20px;">
+            🔎 El tumor es: <strong>{pred}</strong><br>
+            Probabilidad Benigno: {proba_benigno:.2f}
+        </div>
+        """,
+        unsafe_allow_html=True
+
+    )
