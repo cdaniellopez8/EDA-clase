@@ -13,8 +13,7 @@ import scipy.stats as stats
 import pickle
 
 st.set_page_config(page_title="EDA Cancer",
-                   page_icon="📊",
-                   layout="wide")
+                   page_icon="📊")
 
 # -----------------------------
 # Datos
@@ -46,4 +45,5 @@ st.markdown("""
         proporcionando visualizaciones y estadísticas descriptivas para facilitar la comprensión del comportamiento de cada variable 
         según el diagnóstico.
     </div>
+
     """, unsafe_allow_html=True)
